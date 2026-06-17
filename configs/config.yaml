@@ -1,0 +1,18 @@
+defaults:
+  - experiment: mini
+  - _self_
+
+seed: 42
+run_pretrain: true
+run_finetune: true
+run_eval_only: false
+force_download: false
+
+hydra:
+  job:
+    chdir: false
+  run:
+    dir: .
+  sweep:
+    dir: .
+  output_subdir: null

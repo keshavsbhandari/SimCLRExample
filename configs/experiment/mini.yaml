@@ -1,0 +1,91 @@
+# @package _global_
+
+name: mini
+run_pretrain: true
+run_finetune: true
+
+wandb:
+  project: simclr-fraud
+  experiment_name: mini
+  entity: null
+  log_model: false
+
+data:
+  csv_path: data/raw/paysim.csv
+  kaggle_dataset: ealaxi/paysim1
+  target_col: isFraud
+  drop_cols:
+    - isFraud
+    - isFlaggedFraud
+    - nameOrig
+    - nameDest
+    - oldbalanceOrg
+    - newbalanceOrig
+    - oldbalanceDest
+    - newbalanceDest
+  split:
+    test_size: 0.30
+    val_test_ratio: 0.50
+    seed: 42
+  fraction: 0.1
+  fraction_seed: 42
+  augmentation:
+    mode: typed
+    feature_dropout: 0.15
+    noise_std: 0.05
+    category_dropout: 0.15
+  dataloader:
+    num_workers: 12
+    pin_memory: true
+    persistent_workers: false
+    prefetch_factor: 2
+    drop_last_simclr: true
+  batch_size:
+    pretrain: 512
+    finetune_train: 512
+    finetune_eval: 1024
+
+model:
+  hidden_dim: 256
+  embedding_dim: 128
+  projection_dim: 64
+  dropout: 0.2
+  classifier:
+    hidden_dim: 64
+
+pretrain:
+  max_epochs: 5
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  temperature: 0.2
+  log_every_n_steps: 10
+  monitor: val_loss
+  early_stopping_patience: 3
+  accelerator: auto
+  devices: 1
+  precision: 32-true
+  limit_train_batches: null
+  limit_val_batches: null
+
+finetune:
+  max_epochs: 10
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  freeze_encoder: false
+  log_every_n_steps: 10
+  monitor: val_pr_auc
+  early_stopping_patience: 3
+  accelerator: auto
+  devices: 1
+  precision: 32-true
+  encoder_checkpoint: null
+  limit_train_batches: null
+  limit_val_batches: null
+  limit_test_batches: null
+
+eval:
+  enabled: true
+  log_wandb: true
+  save_plots: true
+  thresholds: [0.5, 0.7, 0.9, 0.95, 0.99, 0.995]
+  find_best_f1_on: val

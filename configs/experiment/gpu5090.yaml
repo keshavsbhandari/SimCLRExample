@@ -1,0 +1,95 @@
+# @package _global_
+# RTX 5090: bf16 mixed precision, W&B enabled (via .env)
+#
+# Note: SimCLR NT-Xent builds a [2B x 2B] similarity matrix, so pretrain batch
+# cannot be as large as supervised finetune. Tune pretrain batch if OOM.
+
+name: gpu5090
+run_pretrain: true
+run_finetune: true
+
+wandb:
+  project: simclr-fraud-new-001
+  experiment_name: gpu5090
+  entity: null
+  log_model: false
+
+data:
+  csv_path: data/raw/paysim.csv
+  kaggle_dataset: ealaxi/paysim1
+  target_col: isFraud
+  drop_cols:
+    - isFraud
+    - isFlaggedFraud
+    - nameOrig
+    - nameDest
+    - oldbalanceOrg
+    - newbalanceOrig
+    - oldbalanceDest
+    - newbalanceDest
+  split:
+    test_size: 0.30
+    val_test_ratio: 0.50
+    seed: 42
+  fraction: 1.0
+  fraction_seed: 42
+  augmentation:
+    mode: typed
+    feature_dropout: 0.15
+    noise_std: 0.05
+    category_dropout: 0.15
+  dataloader:
+    num_workers: 16
+    pin_memory: true
+    persistent_workers: true
+    prefetch_factor: 4
+    drop_last_simclr: true
+  batch_size:
+    pretrain: 8192
+    finetune_train: 16384
+    finetune_eval: 16384
+
+model:
+  hidden_dim: 256
+  embedding_dim: 128
+  projection_dim: 64
+  dropout: 0.2
+  classifier:
+    hidden_dim: 64
+
+pretrain:
+  max_epochs: 50
+  lr: 8.0e-3
+  weight_decay: 1.0e-4
+  temperature: 0.2
+  log_every_n_steps: 50
+  monitor: val_loss
+  early_stopping_patience: 5
+  accelerator: gpu
+  devices: 1
+  precision: bf16-mixed
+  limit_train_batches: null
+  limit_val_batches: null
+
+finetune:
+  max_epochs: 30
+  lr: 1.6e-2
+  weight_decay: 1.0e-4
+  freeze_encoder: false
+  log_every_n_steps: 50
+  monitor: val_pr_auc
+  early_stopping_patience: 5
+  accelerator: gpu
+  devices: 1
+  precision: bf16-mixed
+  encoder_checkpoint: null
+  limit_train_batches: null
+  limit_val_batches: null
+  limit_test_batches: null
+
+eval:
+  enabled: true
+  log_wandb: true
+  save_plots: true
+  thresholds: [0.5, 0.7, 0.9, 0.95, 0.99, 0.995]
+  find_best_f1_on: val
