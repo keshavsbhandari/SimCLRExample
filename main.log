@@ -199,3 +199,19 @@
 [2026-06-16 21:11:32,002][simclr_fraud.train.utils][INFO] - Early stopping enabled: monitor=val_loss patience=5 mode=min
 [2026-06-16 21:11:32,040][simclr_fraud.train.pretrain][INFO] - Starting SimCLR pretraining for experiment gpu5090
 [2026-06-16 21:11:35,603][simclr_fraud.train.control][INFO] - Runtime control file: /home/virgo/Desktop/projects/SimCLR/outputs/gpu5090/control.yaml
+[2026-06-16 22:09:18,847][simclr_fraud.train.utils][INFO] - Loaded best checkpoint from /home/virgo/Desktop/projects/SimCLR/outputs/gpu5090/pretrain/checkpoints/best-v9.ckpt
+[2026-06-16 22:09:18,849][simclr_fraud.train.pretrain][INFO] - Saved encoder to /home/virgo/Desktop/projects/SimCLR/outputs/gpu5090/pretrain/encoder.pt
+[2026-06-16 22:09:18,853][simclr_fraud.train.finetune][INFO] - Loading encoder weights from /home/virgo/Desktop/projects/SimCLR/outputs/gpu5090/pretrain/encoder.pt
+[2026-06-16 22:09:18,861][simclr_fraud.train.utils][INFO] - W&B project='simclr-fraud-new-001' (from config), group='gpu5090', run='gpu5090/finetune'
+[2026-06-16 22:09:18,862][simclr_fraud.train.utils][INFO] - Early stopping enabled: monitor=val_pr_auc patience=5 mode=max
+[2026-06-16 22:09:18,872][simclr_fraud.train.finetune][INFO] - Starting fraud classifier finetune for experiment gpu5090
+[2026-06-16 22:09:21,535][simclr_fraud.train.control][INFO] - Runtime control file: /home/virgo/Desktop/projects/SimCLR/outputs/gpu5090/control.yaml
+[2026-06-16 22:10:28,554][simclr_fraud.train.utils][INFO] - Loaded best checkpoint from /home/virgo/Desktop/projects/SimCLR/outputs/gpu5090/finetune/checkpoints/best-v2.ckpt
+[2026-06-16 22:10:28,557][simclr_fraud.train.finetune][INFO] - Saved classifier to /home/virgo/Desktop/projects/SimCLR/outputs/gpu5090/finetune/classifier.pt
+[2026-06-16 22:10:30,723][simclr_fraud.train.utils][INFO] - Saved metrics to /home/virgo/Desktop/projects/SimCLR/outputs/gpu5090/eval/metrics.json
+[2026-06-16 22:10:30,724][simclr_fraud.train.finetune][INFO] - Running evaluation plots for experiment gpu5090
+[2026-06-16 22:10:34,732][simclr_fraud.evaluate.run][INFO] - Best F1 on val: threshold=0.9834 f1=0.3223
+[2026-06-16 22:10:36,549][simclr_fraud.evaluate.run][INFO] - Saved threshold metrics to /home/virgo/Desktop/projects/SimCLR/outputs/gpu5090/eval/threshold_metrics.csv
+[2026-06-16 22:10:38,898][simclr_fraud.evaluate.run][INFO] - Saved evaluation plots to /home/virgo/Desktop/projects/SimCLR/outputs/gpu5090/eval
+[2026-06-16 22:10:40,121][simclr_fraud.evaluate.run][INFO] - Logged evaluation artifacts to W&B
+[2026-06-16 22:10:40,121][simclr_fraud.train.pipeline][INFO] - Pipeline complete for experiment gpu5090

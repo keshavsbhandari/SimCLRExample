@@ -2,6 +2,8 @@
 
 Self-supervised contrastive pretraining (SimCLR-style) for tabular fraud detection on PaySim.
 
+**Pipeline details:** see [docs/PIPELINE.md](docs/PIPELINE.md) for a full flowchart and stage-by-stage explanation.
+
 ## Setup
 
 ```bash
@@ -35,8 +37,16 @@ Notes:
 - Skip `python -m venv .venv`; use `pip install -e .` directly.
 - Always run from the repo root so Hydra finds `configs/`.
 - Use `experiment=colab` (T4-friendly) or `mini`; avoid `gpu5090` (large batches for local RTX 5090).
+- **`data.fraction`** defaults to **0.1 (10%)** in `colab` and `mini`. Override if you need more or less data:
+  ```bash
+  python main.py experiment=colab data.fraction=0.05   # faster smoke run
+  python main.py experiment=colab data.fraction=1.0    # full PaySim — much longer
+  ```
+  Higher fractions and more epochs mean **longer runs** and higher risk of Colab disconnecting; start small, then scale up.
 - `outputs/`, `data/`, and `wandb/` are lost when the runtime ends — log to W&B or copy to Google Drive.
-- Quick smoke test: `WANDB_MODE=disabled python main.py experiment=mini pretrain.max_epochs=1 finetune.max_epochs=1`
+- Quick smoke test: `WANDB_MODE=disabled python main.py experiment=colab pretrain.max_epochs=1 finetune.max_epochs=1`
+
+**PyTorch / install tip:** Colab often ships with PyTorch and CUDA already installed. Reinstalling `torch` via `pip install -e .` can be slow or break the GPU runtime. If install fails or CUDA stops working, temporarily **comment out or remove `torch` (and optionally `lightning`) from `pyproject.toml`**, then run `pip install -e .` so Colab’s preinstalled stack is used. Restore pinned deps for local/CI runs when you are back on your own machine.
 
 ## Run
 
@@ -243,11 +253,23 @@ eval:
 
 Disable with `eval.enabled=false` or `eval.log_wandb=false`.
 
-## CI
+## CI and code quality
 
-GitHub Actions runs `ruff check` and `pytest` on push/PR (see `.github/workflows/ci.yml`). Locally:
+GitHub Actions runs on every push/PR (see `.github/workflows/ci.yml`). Locally:
 
 ```bash
 ruff check src tests
 pytest tests/ -q
 ```
+
+### What is `ruff check`?
+
+**Ruff** is a fast Python linter. `ruff check src tests` scans your source and tests for common bugs and style issues — unused imports, undefined names, risky patterns, and consistency problems — **without running the program**.
+
+It matters because it catches mistakes early (before training or review), keeps the codebase consistent, and runs in seconds in CI so broken style or obvious errors do not get merged.
+
+### What does `pytest` do?
+
+**pytest** runs the automated test suite under `tests/`. These are small, fast checks that verify pieces of the pipeline work as intended: SimCLR loss shape, data subsetting, runtime `control.yaml` behavior, evaluation plot helpers, W&B config resolution, and a mocked predict path.
+
+CI also runs a **short end-to-end smoke test** (1 epoch, few batches on a tiny fixture CSV) so the full `main.py` path still works after changes. pytest does not judge model accuracy — it checks that the **code behaves correctly** and that refactors do not silently break training or evaluation.

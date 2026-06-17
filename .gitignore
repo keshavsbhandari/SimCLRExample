@@ -1,8 +1,9 @@
-# Environment and secrets
-.venv/
-.env
+# Environment and secrets — commit .env.example only, never .env
+.env*
+!.env.example
 
-# Python
+# Python virtualenv
+.venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -31,3 +32,6 @@ wandb/
 
 # Hydra (we use custom output dirs under outputs/)
 multirun/
+
+# Get rid of logs
+main.log
