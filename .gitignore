@@ -32,6 +32,10 @@ wandb/
 
 # Hydra (we use custom output dirs under outputs/)
 multirun/
+lightning_logs/
+
+# Sphinx build output
+docs/_build/
 
 # Get rid of logs
 main.log

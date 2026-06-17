@@ -1,9 +1,24 @@
+"""Contrastive loss and diagnostic metrics for SimCLR pretraining."""
+
 import torch
 import torch.nn.functional as F
 
 
 def nt_xent_loss(z1: torch.Tensor, z2: torch.Tensor, temperature: float = 0.2) -> torch.Tensor:
-    """NT-Xent / InfoNCE loss for SimCLR contrastive learning."""
+    """NT-Xent (InfoNCE) contrastive loss for a batch of projection pairs.
+
+    Treats ``(z1[i], z2[i])`` as positive pairs and all other cross-sample pairs
+    in the ``2B × 2B`` similarity matrix as negatives. Inputs are L2-normalized
+    inside this function.
+
+    Args:
+        z1: Projections for augmented view 1, shape ``[B, D]``.
+        z2: Projections for augmented view 2, shape ``[B, D]``.
+        temperature: Softmax temperature τ; lower values sharpen the distribution.
+
+    Returns:
+        Scalar cross-entropy loss over in-batch negatives.
+    """
     batch_size = z1.size(0)
 
     z1 = F.normalize(z1, dim=1)
@@ -21,7 +36,22 @@ def nt_xent_loss(z1: torch.Tensor, z2: torch.Tensor, temperature: float = 0.2) -
 
 
 def simclr_similarity_metrics(z1: torch.Tensor, z2: torch.Tensor) -> dict[str, torch.Tensor]:
-    """Diagnostic similarity metrics for SimCLR pretraining."""
+    """Diagnostic cosine-similarity metrics for monitoring SimCLR pretraining.
+
+    Useful for tracking whether positive pairs are pulled together and negatives
+    pushed apart during training. All inputs are L2-normalized internally.
+
+    Args:
+        z1: Projections for view 1, shape ``[B, D]``.
+        z2: Projections for view 2, shape ``[B, D]``.
+
+    Returns:
+        Dict with keys:
+
+        - ``positive_similarity``: Mean cosine sim between matched pairs (want ↑).
+        - ``negative_similarity``: Mean cosine sim between negatives (want ↓).
+        - ``similarity_gap``: ``positive - negative`` (want ↑).
+    """
     z1 = F.normalize(z1, dim=1)
     z2 = F.normalize(z2, dim=1)
     batch_size = z1.size(0)

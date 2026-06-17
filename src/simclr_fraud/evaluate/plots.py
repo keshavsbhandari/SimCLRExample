@@ -25,6 +25,16 @@ def threshold_metrics_table(
     y_score: np.ndarray,
     thresholds: list[float],
 ) -> pd.DataFrame:
+    """Compute precision, recall, F1, and confusion counts at fixed thresholds.
+
+    Args:
+        y_true: Binary labels (0/1).
+        y_score: Predicted fraud probabilities.
+        thresholds: Decision thresholds to evaluate.
+
+    Returns:
+        DataFrame with one row per threshold.
+    """
     rows: list[dict[str, Any]] = []
     for target in thresholds:
         preds = y_score >= target
@@ -49,6 +59,15 @@ def threshold_metrics_table(
 
 
 def find_best_f1_threshold(y_true: np.ndarray, y_score: np.ndarray) -> tuple[float, float]:
+    """Find threshold that maximizes F1 on the precision-recall curve.
+
+    Args:
+        y_true: Binary labels.
+        y_score: Predicted probabilities.
+
+    Returns:
+        Tuple ``(best_threshold, best_f1)``.
+    """
     precision, recall, thresholds = precision_recall_curve(y_true, y_score)
     f1_scores = np.zeros_like(thresholds, dtype=float)
     for i, t in enumerate(thresholds):
@@ -64,6 +83,17 @@ def plot_roc_curve(
     marker_thresholds: list[float],
     title: str = "ROC Curve",
 ) -> plt.Figure:
+    """Plot ROC curve with optional threshold markers.
+
+    Args:
+        y_true: Binary labels.
+        y_score: Predicted probabilities.
+        marker_thresholds: Thresholds to annotate on the curve.
+        title: Plot title.
+
+    Returns:
+        Matplotlib figure (caller must save or close).
+    """
     fpr, tpr, roc_thresholds = roc_curve(y_true, y_score)
     roc_auc = roc_auc_score(y_true, y_score)
 
@@ -106,6 +136,17 @@ def plot_pr_curve(
     marker_thresholds: list[float],
     title: str = "Precision-Recall Curve",
 ) -> plt.Figure:
+    """Plot precision-recall curve with optional threshold markers.
+
+    Args:
+        y_true: Binary labels.
+        y_score: Predicted probabilities.
+        marker_thresholds: Thresholds to annotate on the curve.
+        title: Plot title.
+
+    Returns:
+        Matplotlib figure (caller must save or close).
+    """
     precision, recall, pr_thresholds = precision_recall_curve(y_true, y_score)
     pr_auc = average_precision_score(y_true, y_score)
     fraud_rate = float(y_true.mean())
@@ -138,6 +179,15 @@ def plot_pr_curve(
 
 
 def plot_threshold_sweep(threshold_df: pd.DataFrame, title: str = "Metrics vs Threshold") -> plt.Figure:
+    """Plot precision, recall, and F1 vs decision threshold.
+
+    Args:
+        threshold_df: Output of ``threshold_metrics_table``.
+        title: Plot title.
+
+    Returns:
+        Matplotlib figure.
+    """
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.plot(threshold_df["threshold"], threshold_df["precision"], marker="o", label="Precision")
     ax.plot(threshold_df["threshold"], threshold_df["recall"], marker="o", label="Recall")
@@ -156,6 +206,16 @@ def plot_score_distribution(
     y_score: np.ndarray,
     title: str = "Predicted Fraud Score Distribution",
 ) -> plt.Figure:
+    """Plot overlapping histograms of predicted scores for fraud vs non-fraud.
+
+    Args:
+        y_true: Binary labels.
+        y_score: Predicted probabilities.
+        title: Plot title.
+
+    Returns:
+        Matplotlib figure.
+    """
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.hist(y_score[y_true == 0], bins=50, alpha=0.6, density=True, label="Non-fraud")
     ax.hist(y_score[y_true == 1], bins=50, alpha=0.6, density=True, label="Fraud")
@@ -174,6 +234,17 @@ def plot_confusion_matrix(
     threshold: float,
     title: str | None = None,
 ) -> plt.Figure:
+    """Plot 2×2 confusion matrix at a fixed decision threshold.
+
+    Args:
+        y_true: Binary labels.
+        y_score: Predicted probabilities.
+        threshold: Score cutoff for predicting fraud (``y_score >= threshold``).
+        title: Optional plot title; defaults to threshold in title.
+
+    Returns:
+        Matplotlib figure.
+    """
     preds = y_score >= threshold
     cm = confusion_matrix(y_true, preds, labels=[0, 1])
     fig, ax = plt.subplots(figsize=(5, 4))

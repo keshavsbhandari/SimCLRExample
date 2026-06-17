@@ -1,3 +1,5 @@
+"""Shared training utilities: W&B logging, Lightning Trainer, and checkpoints."""
+
 import json
 import logging
 import os
@@ -17,6 +19,7 @@ log = logging.getLogger(__name__)
 
 
 def _resolve_wandb_entity(cfg: DictConfig) -> str | None:
+    """Resolve W&B entity from config or ``WANDB_ENTITY`` env var."""
     entity = cfg.wandb.entity or os.environ.get("WANDB_ENTITY")
     if entity is not None and not str(entity).strip():
         return None
@@ -24,11 +27,25 @@ def _resolve_wandb_entity(cfg: DictConfig) -> str | None:
 
 
 def _wandb_group(cfg: DictConfig) -> str:
+    """W&B group name; defaults to experiment ``name``."""
     return cfg.wandb.get("experiment_name", cfg.name)
 
 
 def resolve_wandb_project(cfg: DictConfig) -> tuple[str, str]:
-    """Return (project_name, source_label). Config/Hydra wins over WANDB_PROJECT env."""
+    """Resolve W&B project name and its source label.
+
+    Priority: ``cfg.wandb.project`` → ``WANDB_PROJECT`` env var.
+
+    Args:
+        cfg: Experiment config with optional ``wandb.project``.
+
+    Returns:
+        Tuple ``(project_name, source_label)`` where source is ``"config"`` or
+        ``"WANDB_PROJECT env"``.
+
+    Raises:
+        ValueError: If neither config nor env provides a project name.
+    """
     yaml_project = cfg.wandb.get("project")
     if yaml_project is not None and str(yaml_project).strip():
         return str(yaml_project).strip(), "config"
@@ -44,6 +61,18 @@ def resolve_wandb_project(cfg: DictConfig) -> tuple[str, str]:
 
 
 def build_wandb_logger(cfg: DictConfig, stage: str) -> WandbLogger | None:
+    """Create a W&B logger for a training stage, or None if disabled/unavailable.
+
+    Skips logging when ``WANDB_MODE=disabled`` or ``WANDB_API_KEY`` is unset.
+    Retries without entity if the configured entity fails to initialize.
+
+    Args:
+        cfg: Experiment config with ``wandb`` and ``name`` fields.
+        stage: Stage label for run name, e.g. ``"pretrain"`` or ``"finetune"``.
+
+    Returns:
+        Initialized ``WandbLogger``, or ``None`` if W&B is disabled or init fails.
+    """
     if os.environ.get("WANDB_MODE") == "disabled":
         log.info("WANDB_MODE=disabled; skipping W&B logger")
         return None
@@ -100,7 +129,14 @@ def build_wandb_logger(cfg: DictConfig, stage: str) -> WandbLogger | None:
 
 
 def load_best_checkpoint(module: L.LightningModule, checkpoint_cb: ModelCheckpoint) -> None:
-    """Restore trainer-saved best weights before export or test."""
+    """Restore trainer-saved best weights into a Lightning module.
+
+    Args:
+        module: Module to load weights into (modified in place).
+        checkpoint_cb: Checkpoint callback from ``build_trainer``; uses
+            ``best_model_path``. Falls back to final epoch weights with a warning
+            if no best checkpoint exists.
+    """
     best_path = checkpoint_cb.best_model_path
     if best_path and Path(best_path).is_file():
         checkpoint = torch.load(best_path, map_location="cpu", weights_only=False)
@@ -118,6 +154,24 @@ def build_trainer(
     mode: str,
     logger: WandbLogger | None,
 ) -> tuple[L.Trainer, ModelCheckpoint]:
+    """Build a Lightning ``Trainer`` with checkpointing and runtime controls.
+
+    Registers ``ModelCheckpoint`` (save top-1), ``RuntimeControlCallback`` (read
+    ``control.yaml`` each epoch), and optional ``EarlyStopping`` when
+    ``stage_cfg.early_stopping_patience > 0``.
+
+    Args:
+        cfg: Full experiment config (used for experiment name in callbacks).
+        stage_cfg: Stage-specific config (``pretrain`` or ``finetune``) with
+            ``max_epochs``, ``accelerator``, ``devices``, etc.
+        checkpoint_dir: Directory for ``best.ckpt``.
+        monitor: Metric name to monitor for checkpointing / early stopping.
+        mode: ``"min"`` or ``"max"`` for the monitored metric.
+        logger: Optional W&B logger from ``build_wandb_logger``.
+
+    Returns:
+        Tuple of ``(trainer, checkpoint_callback)``.
+    """
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_cb = ModelCheckpoint(
         dirpath=str(checkpoint_dir),
@@ -162,6 +216,12 @@ def build_trainer(
 
 
 def save_metrics(metrics: Mapping[str, Any], path: Path) -> None:
+    """Serialize metric dict to JSON (converts tensors/scalars to float).
+
+    Args:
+        metrics: Mapping of metric names to numeric values.
+        path: Output ``.json`` file path.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     serializable = {k: float(v) if hasattr(v, "item") else v for k, v in metrics.items()}
     path.write_text(json.dumps(serializable, indent=2))

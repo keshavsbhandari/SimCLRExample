@@ -1,4 +1,7 @@
-"""Batch scoring on new CSV rows using saved experiment artifacts."""
+"""Batch scoring on new CSV rows using saved experiment artifacts.
+
+CLI entry point: ``simclr-predict`` (see ``main()`` for arguments).
+"""
 
 from __future__ import annotations
 
@@ -20,6 +23,17 @@ log = logging.getLogger(__name__)
 
 
 def load_experiment_config(name: str) -> DictConfig:
+    """Load frozen config from a completed training run.
+
+    Args:
+        name: Experiment name (``outputs/{name}/config_resolved.yaml``).
+
+    Returns:
+        Resolved Hydra config from training.
+
+    Raises:
+        FileNotFoundError: If training has not been run for this experiment.
+    """
     path = resolved_config_path(name)
     if not path.is_file():
         raise FileNotFoundError(
@@ -29,6 +43,17 @@ def load_experiment_config(name: str) -> DictConfig:
 
 
 def load_preprocessor(name: str):
+    """Load sklearn preprocessor saved during ``prepare_data``.
+
+    Args:
+        name: Experiment name.
+
+    Returns:
+        Fitted ``ColumnTransformer`` (or sklearn pipeline).
+
+    Raises:
+        FileNotFoundError: If ``preprocessor.joblib`` is missing.
+    """
     path = preprocessor_path(name)
     if not path.is_file():
         raise FileNotFoundError(
@@ -39,6 +64,7 @@ def load_preprocessor(name: str):
 
 
 def _prepare_features(df: pd.DataFrame, cfg: DictConfig) -> pd.DataFrame:
+    """Drop leakage/metadata columns before preprocessing."""
     drop_cols = [c for c in cfg.data.drop_cols if c in df.columns]
     return df.drop(columns=drop_cols)
 
@@ -50,7 +76,19 @@ def score_dataframe(
     *,
     device: torch.device | None = None,
 ) -> np.ndarray:
-    """Return fraud probabilities for rows in *df*."""
+    """Return fraud probabilities for rows in a PaySim-style DataFrame.
+
+    Applies the saved train-fitted preprocessor and trained classifier.
+    Does not require the target column ``isFraud``.
+
+    Args:
+        cfg: Resolved experiment config from ``load_experiment_config``.
+        df: Input rows with PaySim feature columns.
+        device: Torch device; defaults to CUDA if available.
+
+    Returns:
+        1-D array of fraud probabilities in ``[0, 1]``, length ``len(df)``.
+    """
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -72,6 +110,13 @@ def predict_csv(
     input_path: Path,
     output_path: Path,
 ) -> None:
+    """Score a CSV file and write results with a ``fraud_probability`` column.
+
+    Args:
+        cfg: Resolved experiment config.
+        input_path: Input CSV path.
+        output_path: Output CSV path (parent dirs created if needed).
+    """
     df = pd.read_csv(input_path)
     probs = score_dataframe(cfg, df)
 
@@ -83,6 +128,7 @@ def predict_csv(
 
 
 def main() -> None:
+    """CLI entry point for ``simclr-predict``."""
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="Score a CSV with a trained fraud classifier.")
     parser.add_argument(

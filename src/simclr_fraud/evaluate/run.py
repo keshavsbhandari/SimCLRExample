@@ -37,6 +37,7 @@ DEFAULT_EVAL = {
 
 
 def _eval_settings(cfg: DictConfig) -> DictConfig:
+    """Merge experiment eval config with defaults."""
     if cfg.get("eval"):
         return OmegaConf.merge(OmegaConf.create(DEFAULT_EVAL), cfg.eval)
     return OmegaConf.create(DEFAULT_EVAL)
@@ -48,6 +49,16 @@ def collect_predictions(
     dataloader: DataLoader,
     device: torch.device,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Run model over a dataloader and collect probabilities and labels.
+
+    Args:
+        model: Trained fraud classifier.
+        dataloader: Batches of ``(x, y)``.
+        device: Torch device for inference.
+
+    Returns:
+        Tuple ``(y_score, y_true)`` as numpy arrays.
+    """
     model.eval()
     probs_list: list[torch.Tensor] = []
     targets_list: list[torch.Tensor] = []
@@ -93,7 +104,22 @@ def run_evaluation(
     val_loader: DataLoader | None = None,
     wandb_run: Any | None = None,
 ) -> dict[str, Any]:
-    """Evaluate on test set, save plots locally, and optionally log to W&B."""
+    """Evaluate on test set, save plots locally, and optionally log to W&B.
+
+    Generates ROC/PR curves, threshold sweep, score distribution, and confusion
+    matrices. Writes artifacts to ``outputs/{name}/eval/``.
+
+    Args:
+        cfg: Experiment config with optional ``eval`` section.
+        model: Trained ``FraudClassifier``.
+        test_loader: Held-out test DataLoader.
+        val_loader: Optional validation loader for best-F1 threshold selection.
+        wandb_run: Active W&B run for logging; skipped if ``None``.
+
+    Returns:
+        Summary dict with ``test_roc_auc``, ``test_pr_auc``, fraud rate, and
+        optional ``val_best_f1_threshold`` / ``val_best_f1``.
+    """
     eval_cfg = _eval_settings(cfg)
     out_dir = eval_dir(cfg.name)
     out_dir.mkdir(parents=True, exist_ok=True)

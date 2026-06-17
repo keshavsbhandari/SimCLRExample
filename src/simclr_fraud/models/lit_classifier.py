@@ -1,3 +1,5 @@
+"""PyTorch Lightning module for supervised fraud classifier finetuning."""
+
 import lightning as L
 import torch
 import torch.nn as nn
@@ -15,6 +17,17 @@ from simclr_fraud.models.classifier import FraudClassifier
 
 
 class LitFraudClassifier(L.LightningModule):
+    """Lightning wrapper for binary fraud classification.
+
+    Uses ``BCEWithLogitsLoss`` with class weighting via ``pos_weight`` to handle
+    imbalance. Logs ROC-AUC, PR-AUC, precision, recall, and F1 on val/test epochs.
+
+    Args:
+        model: ``FraudClassifier`` with optional pretrained encoder weights.
+        pos_weight: Ratio ``num_negative / num_positive`` for loss weighting.
+        finetune_cfg: Hydra config with ``lr`` and ``weight_decay``.
+    """
+
     def __init__(
         self,
         model: FraudClassifier,
@@ -22,10 +35,13 @@ class LitFraudClassifier(L.LightningModule):
         finetune_cfg: DictConfig,
     ):
         super().__init__()
+        self.lr = float(finetune_cfg.lr)
+        self.weight_decay = float(finetune_cfg.weight_decay)
+
         self.save_hyperparameters(
             {
-                "lr": finetune_cfg.lr,
-                "weight_decay": finetune_cfg.weight_decay,
+                "lr": self.lr,
+                "weight_decay": self.weight_decay,
             },
             ignore=["model", "pos_weight"],
         )
@@ -46,9 +62,19 @@ class LitFraudClassifier(L.LightningModule):
         self.test_f1 = BinaryF1Score()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Return fraud logits for a batch."""
         return self.model(x)
 
     def shared_step(self, batch, stage: str) -> torch.Tensor:
+        """Compute BCE loss and update epoch-level classification metrics.
+
+        Args:
+            batch: Tuple ``(x, y)`` of features and binary labels.
+            stage: ``"train"``, ``"val"``, or ``"test"``.
+
+        Returns:
+            Scalar BCE loss.
+        """
         x, y = batch
         y = y.float()
         logits = self(x)
@@ -110,6 +136,7 @@ class LitFraudClassifier(L.LightningModule):
         return self.shared_step(batch, stage="test")
 
     def on_validation_epoch_end(self) -> None:
+        """Log aggregated validation metrics and reset torchmetrics state."""
         self.log("val_roc_auc", self.val_auroc.compute(), prog_bar=True)
         self.log("val_pr_auc", self.val_auprc.compute(), prog_bar=True)
         self.log("val_precision", self.val_precision.compute())
@@ -123,6 +150,7 @@ class LitFraudClassifier(L.LightningModule):
         self.val_f1.reset()
 
     def on_test_epoch_end(self) -> None:
+        """Log aggregated test metrics and reset torchmetrics state."""
         self.log("test_roc_auc", self.test_auroc.compute())
         self.log("test_pr_auc", self.test_auprc.compute())
         self.log("test_precision", self.test_precision.compute())
@@ -136,8 +164,9 @@ class LitFraudClassifier(L.LightningModule):
         self.test_f1.reset()
 
     def configure_optimizers(self):
+        """AdamW optimizer from finetune config hyperparameters."""
         return optim.AdamW(
             self.parameters(),
-            lr=self.hparams.lr,
-            weight_decay=self.hparams.weight_decay,
+            lr=self.lr,
+            weight_decay=self.weight_decay,
         )

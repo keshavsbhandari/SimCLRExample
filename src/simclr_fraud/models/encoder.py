@@ -1,8 +1,22 @@
+"""Tabular MLP encoder used in SimCLR pretraining and downstream fraud classification."""
+
 import torch.nn as nn
 
 
 class TabularEncoder(nn.Module):
-    """MLP encoder mapping preprocessed transactions to embeddings."""
+    """Three-layer MLP mapping preprocessed transactions to dense embeddings.
+
+    Architecture: Linear → BatchNorm → ReLU → Dropout (×2 hidden blocks) → Linear.
+
+    The output embedding ``h`` is the representation reused for fraud classification
+    after SimCLR pretraining. The projection head (if any) is applied on top of ``h``.
+
+    Args:
+        input_dim: Number of features after preprocessing (one-hot + scaled numerics).
+        hidden_dim: Width of the two hidden layers.
+        embedding_dim: Output dimension of the encoder (``h``).
+        dropout: Dropout probability applied after each hidden ReLU.
+    """
 
     def __init__(
         self,
@@ -25,4 +39,12 @@ class TabularEncoder(nn.Module):
         )
 
     def forward(self, x):
+        """Encode a batch of preprocessed transactions.
+
+        Args:
+            x: Float tensor of shape ``[B, input_dim]``.
+
+        Returns:
+            Encoder embeddings ``h`` of shape ``[B, embedding_dim]``.
+        """
         return self.net(x)

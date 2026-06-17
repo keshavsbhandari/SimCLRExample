@@ -1,4 +1,10 @@
-"""Download CSV, preprocess in memory, and create DataLoaders."""
+"""PaySim download, sklearn preprocessing, and PyTorch DataLoader construction.
+
+Pipeline: download CSV → stratified train/val/test split → fit preprocessor on
+train only → optional stratified subsample → build SimCLR and supervised loaders.
+
+See ``docs/PIPELINE.md`` for the full data stage in context.
+"""
 
 from __future__ import annotations
 
@@ -29,6 +35,20 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class ExperimentData:
+    """All tensors and DataLoaders needed for pretrain and finetune stages.
+
+    Attributes:
+        input_dim: Preprocessed feature dimension after one-hot encoding.
+        pos_weight: ``num_negative / num_positive`` for BCE loss weighting.
+        numeric_indices: Column indices for typed SimCLR augmentation.
+        categorical_slices: One-hot block slices for typed augmentation.
+        simclr_train: Augmented pairs for contrastive pretraining (shuffled).
+        simclr_val: Augmented pairs for pretrain validation.
+        train: Supervised train loader for classifier finetune.
+        val: Supervised validation loader.
+        test: Held-out test loader (used after finetune).
+    """
+
     input_dim: int
     pos_weight: torch.Tensor
     numeric_indices: list[int]
@@ -51,7 +71,20 @@ def stratified_tensor_subset(
     fraction: float = 1.0,
     random_state: int = 42,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Select a stratified subset of tensors, preserving fraud ratio."""
+    """Select a stratified subset of tensors, preserving fraud ratio.
+
+    Args:
+        X: Feature tensor of shape ``[N, D]``.
+        y: Label tensor of shape ``[N]``.
+        fraction: Fraction of rows to keep in ``(0, 1]``. Returns unchanged if ``>= 1``.
+        random_state: Seed for sklearn stratified sampling.
+
+    Returns:
+        Subset ``(X_sub, y_sub)`` with approximately the same fraud rate.
+
+    Raises:
+        ValueError: If ``fraction`` is not in ``(0, 1]``.
+    """
     if fraction >= 1.0:
         return X, y
 
@@ -82,7 +115,21 @@ def stratified_tensor_subset(
 
 
 def ensure_csv(cfg: DictConfig, force: bool = False) -> Path:
-    """Download PaySim CSV to cfg.data.csv_path if missing (or if force=True)."""
+    """Download PaySim CSV to ``cfg.data.csv_path`` if missing.
+
+    Uses ``kagglehub`` with ``cfg.data.kaggle_dataset``. Caches locally after
+    first download unless ``force=True``.
+
+    Args:
+        cfg: Experiment config with ``data.csv_path`` and ``data.kaggle_dataset``.
+        force: If True, delete cached CSV and re-download.
+
+    Returns:
+        Absolute path to the local CSV file.
+
+    Raises:
+        FileNotFoundError: If the Kaggle dataset contains no CSV file.
+    """
     csv_path = _resolve_path(cfg.data.csv_path)
     if force and csv_path.exists():
         csv_path.unlink()
@@ -280,7 +327,18 @@ def _simclr_dataset(cfg: DictConfig, X: torch.Tensor, feature_info: dict) -> Sim
 
 
 def prepare_data(cfg: DictConfig) -> ExperimentData:
-    """Load CSV, preprocess in memory, and return dataloaders for training."""
+    """Load PaySim, preprocess, and build all training DataLoaders.
+
+    Fits the sklearn preprocessor on the training split only, saves
+    ``preprocessor.joblib`` to the experiment output dir, and applies
+    ``cfg.data.fraction`` subsampling per split.
+
+    Args:
+        cfg: Full Hydra experiment config (``data``, ``name``, batch sizes).
+
+    Returns:
+        ``ExperimentData`` with SimCLR and supervised loaders ready for training.
+    """
     tensors, feature_info = _load_splits(cfg)
 
     X_train = tensors["X_train"]

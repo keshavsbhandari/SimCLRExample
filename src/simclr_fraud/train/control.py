@@ -30,6 +30,7 @@ max_epochs: null
 
 
 def read_control(experiment_name: str) -> DictConfig | None:
+    """Load ``outputs/{name}/control.yaml`` if it exists."""
     path = control_path(experiment_name)
     if not path.exists():
         return None
@@ -37,7 +38,17 @@ def read_control(experiment_name: str) -> DictConfig | None:
 
 
 def ensure_control_file(experiment_name: str) -> DictConfig:
-    """Create control.yaml with defaults if missing; return current contents."""
+    """Create ``control.yaml`` with defaults if missing; return current contents.
+
+    The control file can be edited during training to stop early, cap epochs,
+    or skip finetune after pretrain completes.
+
+    Args:
+        experiment_name: Hydra experiment ``name``.
+
+    Returns:
+        Parsed control config.
+    """
     path = control_path(experiment_name)
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
@@ -49,12 +60,22 @@ def ensure_control_file(experiment_name: str) -> DictConfig:
 
 
 def should_skip_finetune(experiment_name: str) -> bool:
+    """Return True if ``control.yaml`` has ``skip_finetune: true``."""
     control = read_control(experiment_name)
     return control is not None and bool(control.get("skip_finetune", False))
 
 
 class RuntimeControlCallback(Callback):
-    """Stop or cap epochs based on outputs/{name}/control.yaml."""
+    """Stop or cap epochs based on ``outputs/{name}/control.yaml``.
+
+    Checked at the end of each training epoch. Supports:
+
+    - ``stop: true`` — finish current epoch, save checkpoint, exit stage.
+    - ``max_epochs: N`` — stop once ``N`` epochs have completed.
+
+    Args:
+        experiment_name: Hydra experiment ``name`` (locates control file).
+    """
 
     def __init__(self, experiment_name: str) -> None:
         self.experiment_name = experiment_name

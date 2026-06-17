@@ -1,3 +1,5 @@
+"""SimCLR contrastive pretraining stage."""
+
 import logging
 
 import torch
@@ -12,6 +14,19 @@ log = logging.getLogger(__name__)
 
 
 def run_pretrain(cfg: DictConfig, data: ExperimentData) -> LitSimCLR:
+    """Train SimCLR with NT-Xent loss and export the encoder weights.
+
+    Fits ``LitSimCLR`` on ``data.simclr_train`` / ``data.simclr_val``, restores
+    the best checkpoint (by ``cfg.pretrain.monitor``), and saves encoder-only
+    weights to ``outputs/{name}/pretrain/encoder.pt``.
+
+    Args:
+        cfg: Experiment config with ``model``, ``pretrain``, and ``wandb`` sections.
+        data: Prepared loaders and feature metadata from ``prepare_data``.
+
+    Returns:
+        Trained ``LitSimCLR`` module with best weights loaded.
+    """
     model = LitSimCLR(
         input_dim=data.input_dim,
         model_cfg=cfg.model,

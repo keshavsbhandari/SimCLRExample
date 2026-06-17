@@ -1,3 +1,5 @@
+"""PyTorch datasets for SimCLR pretraining and supervised fraud classification."""
+
 import torch
 from torch.utils.data import Dataset
 
@@ -5,7 +7,29 @@ AugmentMode = str  # "typed" | "uniform"
 
 
 class SimCLRTabularDataset(Dataset):
-    """Self-supervised dataset returning two augmented views per transaction."""
+    """Self-supervised dataset returning two augmented views per transaction.
+
+  Each ``__getitem__`` call independently augments the same row twice, producing
+  a positive pair ``(x1, x2)`` for NT-Xent contrastive learning. Labels are
+  not used during pretraining.
+
+  Augmentation modes:
+
+  - ``uniform``: Feature dropout + Gaussian noise on all columns.
+  - ``typed``: Noise/dropout on numeric columns; whole one-hot category blocks
+    zeroed with ``category_dropout`` probability.
+
+  Args:
+      X: Preprocessed feature tensor of shape ``[N, D]``.
+      feature_dropout: Probability of zeroing a numeric feature (or all features
+          in uniform mode).
+      noise_std: Standard deviation of Gaussian noise added to numerics.
+      mode: ``"typed"`` or ``"uniform"``.
+      numeric_indices: Column indices of scaled numeric features (typed mode).
+      categorical_slices: ``(start, end)`` slices for one-hot blocks (typed mode).
+      category_dropout: Probability of zeroing an entire categorical block.
+          Defaults to ``feature_dropout`` when omitted.
+  """
 
     def __init__(
         self,
@@ -33,6 +57,7 @@ class SimCLRTabularDataset(Dataset):
             )
 
     def augment(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply one stochastic augmentation to a single feature vector."""
         if self.mode == "uniform":
             return self._augment_uniform(x)
         return self._augment_typed(x)
@@ -64,12 +89,18 @@ class SimCLRTabularDataset(Dataset):
         return len(self.X)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return two independent augmented views of transaction ``idx``."""
         x = self.X[idx]
         return self.augment(x), self.augment(x)
 
 
 class FraudDataset(Dataset):
-    """Supervised fraud classification dataset."""
+    """Supervised dataset of preprocessed transactions and fraud labels.
+
+    Args:
+        X: Feature tensor of shape ``[N, D]``.
+        y: Binary labels of shape ``[N]`` (0 = legitimate, 1 = fraud).
+    """
 
     def __init__(self, X: torch.Tensor, y: torch.Tensor):
         self.X = X

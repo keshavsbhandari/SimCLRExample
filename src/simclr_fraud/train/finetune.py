@@ -1,3 +1,5 @@
+"""Supervised fraud classifier finetune stage."""
+
 import logging
 from pathlib import Path
 
@@ -16,6 +18,7 @@ log = logging.getLogger(__name__)
 
 
 def _resolve_encoder_checkpoint(cfg: DictConfig) -> Path | None:
+    """Return path to pretrained encoder weights, if available."""
     if cfg.finetune.encoder_checkpoint:
         return Path(cfg.finetune.encoder_checkpoint)
 
@@ -27,6 +30,12 @@ def _resolve_encoder_checkpoint(cfg: DictConfig) -> Path | None:
 
 
 def _build_fraud_model(cfg: DictConfig, input_dim: int) -> FraudClassifier:
+    """Construct ``FraudClassifier`` with optional pretrained encoder weights.
+
+    Loads from ``cfg.finetune.encoder_checkpoint`` or default ``encoder.pt``.
+    If no checkpoint exists, uses a random encoder (supervised baseline).
+    Optionally freezes encoder when ``cfg.finetune.freeze_encoder`` is True.
+    """
     encoder = TabularEncoder(
         input_dim=input_dim,
         hidden_dim=cfg.model.hidden_dim,
@@ -57,6 +66,19 @@ def _build_fraud_model(cfg: DictConfig, input_dim: int) -> FraudClassifier:
 
 
 def run_finetune(cfg: DictConfig, data: ExperimentData) -> LitFraudClassifier:
+    """Finetune fraud classifier, test, and run evaluation plots.
+
+    Trains ``LitFraudClassifier`` on supervised loaders, saves ``classifier.pt``,
+    runs Lightning ``test``, writes ``eval/metrics.json``, and optionally generates
+    ROC/PR plots via ``run_evaluation``.
+
+    Args:
+        cfg: Experiment config with ``model``, ``finetune``, ``eval``, and ``wandb``.
+        data: Prepared loaders including ``pos_weight`` for class imbalance.
+
+    Returns:
+        Trained ``LitFraudClassifier`` with best weights loaded.
+    """
     fraud_model = _build_fraud_model(cfg, data.input_dim)
     lit_model = LitFraudClassifier(
         model=fraud_model,

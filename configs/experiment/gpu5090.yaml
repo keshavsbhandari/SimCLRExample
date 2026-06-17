@@ -9,7 +9,7 @@ run_pretrain: true
 run_finetune: true
 
 wandb:
-  project: simclr-fraud-new-001
+  project: simclr-fraud-new-003-smoke-test
   experiment_name: gpu5090
   entity: null
   log_model: false
@@ -58,7 +58,7 @@ model:
     hidden_dim: 64
 
 pretrain:
-  max_epochs: 50
+  max_epochs: 5
   lr: 8.0e-3
   weight_decay: 1.0e-4
   temperature: 0.2

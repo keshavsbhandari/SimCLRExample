@@ -17,7 +17,14 @@ log = logging.getLogger(__name__)
 
 
 def run_eval_only(cfg: DictConfig) -> None:
-    """Load saved classifier, run test metrics and evaluation plots."""
+    """Load saved classifier, run test metrics and evaluation plots.
+
+    Used when ``run_eval_only=true`` in config — skips pretrain and finetune,
+    reloads ``classifier.pt`` and the preprocessor, and writes eval artifacts.
+
+    Args:
+        cfg: Experiment config with ``name`` matching a completed training run.
+    """
     data = prepare_data(cfg)
     model = load_classifier(cfg, data.input_dim)
 

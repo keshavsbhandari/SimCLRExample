@@ -1,3 +1,5 @@
+"""Neural network components for SimCLR pretraining and fraud classification."""
+
 from simclr_fraud.models.classifier import FraudClassifier
 from simclr_fraud.models.encoder import TabularEncoder
 from simclr_fraud.models.lit_classifier import LitFraudClassifier

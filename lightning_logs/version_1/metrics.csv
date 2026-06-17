@@ -1,4 +1,0 @@
-epoch,step,test_f1,test_loss,test_pr_auc,test_precision,test_recall,test_roc_auc,train_loss_epoch,val_f1,val_loss,val_pr_auc,val_precision,val_recall,val_roc_auc
-0,0,,,,,,,,0.0,1.218498706817627,0.2420554906129837,0.0,0.0,0.7003366947174072
-0,0,,,,,,,1.2425785064697266,,,,,,
-1,1,0.0,1.222038984298706,0.1902966946363449,0.0,0.0,0.46296295523643494,,,,,,,

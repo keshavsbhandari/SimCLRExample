@@ -1,3 +1,8 @@
+"""PyTorch Lightning module for SimCLR contrastive pretraining.
+
+See ``docs/PIPELINE.md`` for where this stage fits in the full training flow.
+"""
+
 import lightning as L
 import torch
 import torch.optim as optim
@@ -9,6 +14,19 @@ from simclr_fraud.models.projection import ProjectionHead
 
 
 class LitSimCLR(L.LightningModule):
+    """Lightning wrapper for SimCLR pretraining on tabular transaction data.
+
+    Each training batch is ``(x1, x2)``: two independently augmented views of
+    the same transaction. NT-Xent loss is computed on projection vectors ``z``;
+    encoder embeddings ``h`` are logged for diagnostics and exported after training.
+
+    Args:
+        input_dim: Preprocessed feature dimension.
+        model_cfg: Hydra config with ``hidden_dim``, ``embedding_dim``,
+            ``projection_dim``, and ``dropout``.
+        pretrain_cfg: Hydra config with ``lr``, ``weight_decay``, and ``temperature``.
+    """
+
     def __init__(
         self,
         input_dim: int,
@@ -16,12 +34,16 @@ class LitSimCLR(L.LightningModule):
         pretrain_cfg: DictConfig,
     ):
         super().__init__()
+        self.lr = float(pretrain_cfg.lr)
+        self.weight_decay = float(pretrain_cfg.weight_decay)
+        self.temperature = float(pretrain_cfg.temperature)
+
         self.save_hyperparameters(
             {
                 "input_dim": input_dim,
-                "lr": pretrain_cfg.lr,
-                "weight_decay": pretrain_cfg.weight_decay,
-                "temperature": pretrain_cfg.temperature,
+                "lr": self.lr,
+                "weight_decay": self.weight_decay,
+                "temperature": self.temperature,
             }
         )
 
@@ -37,19 +59,44 @@ class LitSimCLR(L.LightningModule):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Return encoder embedding ``h`` (no projection head).
+
+        Args:
+            x: Preprocessed batch of shape ``[B, input_dim]``.
+
+        Returns:
+            Embeddings of shape ``[B, embedding_dim]``.
+        """
         return self.encoder(x)
 
     def project(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Encode and project a batch for contrastive loss.
+
+        Args:
+            x: Preprocessed batch of shape ``[B, input_dim]``.
+
+        Returns:
+            Tuple ``(h, z)`` of encoder embedding and projection vectors.
+        """
         h = self.encoder(x)
         z = self.projection_head(h)
         return h, z
 
     def shared_step(self, batch, stage: str) -> torch.Tensor:
+        """Compute contrastive loss and log similarity metrics.
+
+        Args:
+            batch: Tuple ``(x1, x2)`` of augmented views.
+            stage: ``"train"`` or ``"val"`` — used as metric name prefix.
+
+        Returns:
+            Scalar NT-Xent loss.
+        """
         x1, x2 = batch
         h1, z1 = self.project(x1)
         h2, z2 = self.project(x2)
 
-        loss = nt_xent_loss(z1, z2, temperature=self.hparams.temperature)
+        loss = nt_xent_loss(z1, z2, temperature=self.temperature)
         metrics = simclr_similarity_metrics(z1, z2)
 
         avg_embedding_norm = (h1.norm(dim=1).mean() + h2.norm(dim=1).mean()) / 2
@@ -97,8 +144,9 @@ class LitSimCLR(L.LightningModule):
         return self.shared_step(batch, stage="val")
 
     def configure_optimizers(self):
+        """AdamW optimizer from pretrain config hyperparameters."""
         return optim.AdamW(
             self.parameters(),
-            lr=self.hparams.lr,
-            weight_decay=self.hparams.weight_decay,
+            lr=self.lr,
+            weight_decay=self.weight_decay,
         )

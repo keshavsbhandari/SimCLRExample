@@ -1,3 +1,9 @@
+"""Training pipeline orchestration: pretrain, finetune, and eval-only modes.
+
+See ``docs/PIPELINE.md`` for the end-to-end flow from ``main.py`` through
+each stage.
+"""
+
 import logging
 
 import lightning as L
@@ -15,7 +21,21 @@ log = logging.getLogger(__name__)
 
 
 def run_pipeline(cfg: DictConfig) -> None:
-    """Run pretrain and/or finetune according to *cfg*."""
+    """Run pretrain and/or finetune according to Hydra config flags.
+
+    Typical flow:
+
+    1. Validate config and create output directories.
+    2. Save ``config_resolved.yaml`` and seed RNGs.
+    3. If ``run_eval_only``: load saved classifier and run evaluation only.
+    4. Else: ``prepare_data`` → optional ``run_pretrain`` → optional ``run_finetune``.
+
+    Finetune is skipped when ``control.yaml`` has ``skip_finetune: true``.
+
+    Args:
+        cfg: Fully merged Hydra config. Key flags: ``run_pretrain``, ``run_finetune``,
+            ``run_eval_only``, ``name``, ``seed``.
+    """
     validate_config(cfg)
     ensure_experiment_dirs(cfg)
     ensure_control_file(cfg.name)
